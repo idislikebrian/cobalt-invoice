@@ -8,9 +8,35 @@ export const sampleInvoice = invoiceSchema.parse({
   currency: 'USD',
   sender: {
     name: 'Brian Felix',
+    businessName: 'Cobalt',
+    address: {
+      line1: '[N°] [Street Name]',
+      postalCode: '11213',
+      city: 'Brooklyn',
+      region: 'NY',
+      country: 'USA',
+    },
+    footer: {
+      companyAddress: '[Company address]',
+      websiteLabel: 'wearecobalt.net',
+      websiteUrl: 'https://wearecobalt.net',
+      phoneLabel: '+1 201.218.1047',
+      phoneHref: 'tel:+12012181047',
+      socialLabel: 'I: @58.933194',
+      generalEmail: 'hi@wearecobalt.net',
+      contactName: 'Brian',
+      contactEmail: 'hello@brian-felix.com',
+    },
   },
   client: {
-    name: 'Wheels of NYC',
+    name: 'Oren Hod',
+    businessName: 'Wheels of NYC',
+    address: {
+      line1: '[N°] [Street Name]',
+      postalCode: '[Postal Code]',
+      city: '[City]',
+      country: '[Country]',
+    },
   },
   lineItems: [
     {
