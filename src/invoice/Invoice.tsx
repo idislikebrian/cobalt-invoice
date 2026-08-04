@@ -13,6 +13,7 @@ import './invoice.css'
 
 interface InvoiceProps {
   invoice: InvoiceData
+  renderMode?: 'preview' | 'final'
 }
 
 interface PartyDetailsProps {
@@ -114,7 +115,7 @@ function PartyDetails({ party, nameOrder }: PartyDetailsProps) {
   )
 }
 
-export function Invoice({ invoice }: InvoiceProps) {
+export function Invoice({ invoice, renderMode = 'preview' }: InvoiceProps) {
   const subtotal = calculateSubtotal(invoice.lineItems)
   const discount = calculateDiscount(invoice)
   const salesTax = calculateSalesTax(invoice)
@@ -134,7 +135,7 @@ export function Invoice({ invoice }: InvoiceProps) {
 
   return (
     <main className={`invoice-page${invoice.template === 'weekly-time' ? ' weekly-time-invoice' : ''}`} aria-label={`Invoice ${invoice.invoiceNumber}`}>
-      {invoice.template === 'weekly-time' && <div className="draft-watermark" aria-label="Preview draft">DRAFT · PREVIEW</div>}
+      {invoice.template === 'weekly-time' && renderMode === 'preview' && <div className="draft-watermark" aria-label="Preview draft">DRAFT · PREVIEW</div>}
       <div className="decorative-rail" aria-hidden="true">
         {RAIL_MARKS.map((mark) => (
           <span
@@ -195,9 +196,11 @@ export function Invoice({ invoice }: InvoiceProps) {
         <h1>Invoice</h1>
         <div className="identity-number">
           <p>{invoice.invoiceNumber}</p>
-          <span className="identity-secondary invoice-status">
-            {invoice.status}
-          </span>
+          {renderMode === 'preview' && (
+            <span className="identity-secondary invoice-status">
+              {invoice.status}
+            </span>
+          )}
         </div>
         <div className="identity-date">
           <time dateTime={invoice.issueDate}>

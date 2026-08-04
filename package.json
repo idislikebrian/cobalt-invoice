@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "test": "tsx --test test/*.test.ts src/invoice/calculations.test.ts",
     "invoice:artisan:preview": "node --env-file-if-exists=.env.local --import tsx scripts/artisan/preview.ts",
+    "invoice:artisan:finalize": "node --env-file-if-exists=.env.local --import tsx scripts/artisan/finalize.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -27,6 +28,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.7.0",
+    "pdfjs-dist": "^6.2.108",
     "playwright": "^1.61.1",
     "tsx": "^4.23.1",
     "typescript": "~6.0.2",

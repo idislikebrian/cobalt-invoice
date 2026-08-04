@@ -39,11 +39,23 @@ Track API v9 is the primary source; the command does not attempt the Pro-only De
 Artifacts are written beneath `output/previews/<preview-id>/`, which is ignored by Git:
 
 - `<invoice-number>.preview.pdf` — client-facing draft, generated only when that week has no blockers
+- `<invoice-number>.invoice.json` — frozen invoice snapshot used by finalization
 - `<invoice-number>.audit.json` — internal reconciliation detail; never embedded in the PDF
 - `acquisition-audit.json` — privacy-bounded aggregate counts, relevant Cobalt/Artisan names, and description Unicode diagnostics
 - `batch-summary.json` — batch totals and blocker counts
+- `preview-manifest.json` — invoice/audit snapshot hashes and totals
 
-Every weekly PDF is visibly marked `DRAFT · PREVIEW`. Finalization and delivery are intentionally not implemented yet.
+Every preview PDF is visibly marked `DRAFT · PREVIEW`; preview mode never suppresses its Draft indicators.
+
+After reviewing and approving a specific preview directory, finalize exactly that frozen batch with an explicit path and invoice-number confirmation:
+
+```sh
+npm run invoice:artisan:finalize -- \
+  --preview-dir output/previews/<preview-id> \
+  --invoice-numbers 000702,000703,000704,000705,000706
+```
+
+Finalization does not contact Toggl. It validates the frozen invoice snapshots, audits, hashes, blockers, expected numbers, and duplicate-final protection before rendering. Finals are written once to a new timestamped, read-only directory beneath `output/final/`, with a `finalization-manifest.json` containing source and PDF SHA-256 hashes, timestamp, invoice numbers, and totals. Existing final invoice numbers are never overwritten. Finalization does not send invoices or write to Airtable; delivery remains intentionally unimplemented.
 
 ## Billing behavior
 

@@ -28,11 +28,15 @@ const suppliedInvoice = encodedInvoice
 
 const previewInvoice = {
   ...suppliedInvoice,
-  ...(hasPaymentDetails && { paymentDetails: environmentPaymentDetails }),
+  ...(hasPaymentDetails && !suppliedInvoice.paymentDetails && { paymentDetails: environmentPaymentDetails }),
 }
 
+const renderMode = new URLSearchParams(window.location.search).get('render') === 'final'
+  ? 'final'
+  : 'preview'
+
 function App() {
-  return <Invoice invoice={previewInvoice} />
+  return <Invoice invoice={previewInvoice} renderMode={renderMode} />
 }
 
 export default App

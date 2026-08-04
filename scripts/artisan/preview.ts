@@ -6,6 +6,8 @@ import { createServer } from 'vite'
 import { createBillingWeeks } from '../../src/artisan/batch.ts'
 import { buildWeeklyPreviews } from '../../src/artisan/pipeline.ts'
 import { sampleInvoice } from '../../src/invoice/sample-invoice.ts'
+import { invoiceSchema } from '../../src/invoice/schema.ts'
+import { jsonArtifact, sha256, type PreviewManifest } from './finalization.ts'
 import { fetchTrackEntries } from './track.ts'
 
 function argumentsFrom(argv: string[]): { from: string; through: string; startNumber: string } {
@@ -27,6 +29,21 @@ function money(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`
 }
 
+function frozenPaymentDetails(): Record<string, string> | undefined {
+  const values = {
+    bankName: process.env.VITE_PAYMENT_BANK_NAME,
+    routingNumber: process.env.VITE_PAYMENT_ROUTING_NUMBER,
+    accountNumber: process.env.VITE_PAYMENT_ACCOUNT_NUMBER,
+    ethereumNetwork: process.env.VITE_PAYMENT_ETHEREUM_NETWORK,
+    ethereumAddress: process.env.VITE_PAYMENT_ETHEREUM_ADDRESS,
+    zellePhone: process.env.VITE_PAYMENT_ZELLE_PHONE,
+  }
+  const populated = Object.fromEntries(
+    Object.entries(values).filter((entry): entry is [string, string] => Boolean(entry[1])),
+  )
+  return Object.keys(populated).length > 0 ? populated : undefined
+}
+
 async function main(): Promise<void> {
   const args = argumentsFrom(process.argv.slice(2))
   const token = process.env.TOGGL_API_TOKEN
@@ -40,23 +57,56 @@ async function main(): Promise<void> {
     through: args.through,
   })
   const result = buildWeeklyPreviews(acquisition.entries, weeks, sampleInvoice.sender)
+  const paymentDetails = frozenPaymentDetails()
+  for (const preview of result.previews) {
+    preview.invoice = invoiceSchema.parse({
+      ...preview.invoice,
+      ...(paymentDetails && { paymentDetails }),
+    })
+  }
   for (const preview of result.previews) {
     preview.audit.blockers.push(...acquisition.audit.blockers)
   }
 
-  const previewId = new Date().toISOString().replace(/[:.]/g, '-')
+  const createdAt = new Date().toISOString()
+  const previewId = createdAt.replace(/[:.]/g, '-')
   const outputDirectory = path.resolve('output', 'previews', previewId)
   await mkdir(outputDirectory, { recursive: true })
   await writeFile(
     path.join(outputDirectory, 'acquisition-audit.json'),
-    `${JSON.stringify(acquisition.audit, null, 2)}\n`,
+    jsonArtifact(acquisition.audit),
   )
   console.log('Safe acquisition audit:')
   console.log(JSON.stringify(acquisition.audit, null, 2))
 
+  const sourceRecords: PreviewManifest['sources'] = []
   for (const preview of result.previews) {
-    await writeFile(path.join(outputDirectory, `${preview.invoice.invoiceNumber}.audit.json`), `${JSON.stringify(preview.audit, null, 2)}\n`)
+    const invoiceNumber = preview.invoice.invoiceNumber
+    const invoiceFile = `${invoiceNumber}.invoice.json`
+    const auditFile = `${invoiceNumber}.audit.json`
+    const invoiceArtifact = jsonArtifact(preview.invoice)
+    const auditArtifact = jsonArtifact(preview.audit)
+    await Promise.all([
+      writeFile(path.join(outputDirectory, invoiceFile), invoiceArtifact),
+      writeFile(path.join(outputDirectory, auditFile), auditArtifact),
+    ])
+    sourceRecords.push({
+      invoiceNumber,
+      invoiceFile,
+      invoiceSha256: sha256(invoiceArtifact),
+      auditFile,
+      auditSha256: sha256(auditArtifact),
+      totalCents: preview.audit.finalTotalCents,
+    })
   }
+  const previewManifest: PreviewManifest = {
+    version: 1,
+    previewId,
+    createdAt,
+    invoiceNumbers: result.previews.map(({ invoice }) => invoice.invoiceNumber),
+    sources: sourceRecords,
+  }
+  await writeFile(path.join(outputDirectory, 'preview-manifest.json'), jsonArtifact(previewManifest))
 
   const renderablePreviews = result.previews.filter(
     (preview) => preview.audit.blockers.length === 0,
@@ -92,7 +142,7 @@ async function main(): Promise<void> {
     total: money(audit.finalTotalCents),
     blockerCount: audit.blockers.length,
   }))
-  await writeFile(path.join(outputDirectory, 'batch-summary.json'), `${JSON.stringify({ previewId, summaries: summary }, null, 2)}\n`)
+  await writeFile(path.join(outputDirectory, 'batch-summary.json'), jsonArtifact({ previewId, summaries: summary }))
   console.table(summary)
   console.log(`Preview artifacts: ${outputDirectory}`)
   if (result.unassignedBlockers.length > 0) {
