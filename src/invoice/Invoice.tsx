@@ -51,18 +51,18 @@ function WeeklyTimeWorklog({ worklog }: { worklog: NonNullable<InvoiceData['week
 
   return (
     <section className="weekly-time-region" aria-label="Weekly time detail">
-      <div className="weekly-source">
-        <span><strong>Project:</strong> {worklog.project}</span>
-        <span><strong>Description:</strong> {worklog.description}</span>
-      </div>
       <table className="weekly-time-matrix">
+        <colgroup>
+          <col className="weekly-service-column" />
+          {worklog.dates.map((date) => <col className="weekly-day-column" key={date} />)}
+        </colgroup>
         <thead>
           <tr>
             <th aria-label="Category" />
             {worklog.dates.map((date) => <th key={date}>{formatMatrixDate(date)}</th>)}
           </tr>
           <tr>
-            <th scope="col">Service</th>
+            <th aria-label="Service category" />
             {WEEKDAY_LABELS.map((day) => <th scope="col" key={day}>{day}</th>)}
           </tr>
         </thead>
@@ -210,9 +210,6 @@ export function Invoice({ invoice }: InvoiceProps) {
       </section>
 
       <div className="invoice-commerce-area">
-        {invoice.template === 'weekly-time' && invoice.weeklyTimeWorklog && (
-          <WeeklyTimeWorklog worklog={invoice.weeklyTimeWorklog} />
-        )}
         <div className="invoice-items-group">
           <div className="line-items-region">
             <table className="invoice-items">
@@ -247,6 +244,10 @@ export function Invoice({ invoice }: InvoiceProps) {
             </table>
           </div>
         </div>
+
+        {invoice.template === 'weekly-time' && invoice.weeklyTimeWorklog && (
+          <WeeklyTimeWorklog worklog={invoice.weeklyTimeWorklog} />
+        )}
 
         <section className="invoice-summary" aria-label="Invoice totals">
           <dl>

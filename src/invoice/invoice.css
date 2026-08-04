@@ -172,57 +172,81 @@
 }
 
 .weekly-time-region {
-  margin: 14px 0 18px;
+  margin: 14px 0 0;
 }
 
-.weekly-source {
-  display: flex;
-  gap: 24px;
-  margin-bottom: 7px;
-  color: #454845;
-  font-size: 9px;
+.weekly-time-invoice .invoice-information {
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
 }
 
-.weekly-time-matrix {
+.weekly-time-invoice .invoice-information > section:first-child .information-columns {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.weekly-time-invoice .invoice-information > section:last-child .information-columns {
+  grid-template-columns: minmax(0, 1fr) 145px;
+  gap: 12px;
+}
+
+.weekly-time-invoice .invoice-information > section:last-child .information-secondary span:first-child {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.weekly-time-invoice .weekly-time-matrix {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
   font-variant-numeric: tabular-nums;
 }
 
-.weekly-time-matrix th,
-.weekly-time-matrix td {
+.weekly-time-invoice .weekly-time-matrix th,
+.weekly-time-invoice .weekly-time-matrix td {
   padding: 4px 5px;
-  border: 1px solid var(--rule);
-  text-align: right;
+  vertical-align: middle;
 }
 
-.weekly-time-matrix thead th {
-  background: var(--cobalt);
-  color: #fff;
+.weekly-time-invoice .weekly-time-matrix thead th {
+  border: 0;
+  background: #cbdcf0;
+  color: #173b67;
   font-size: 8px;
-  font-weight: 500;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
-.weekly-time-matrix thead tr:first-child th {
+.weekly-time-invoice .weekly-time-matrix thead tr:first-child th {
   padding-bottom: 1px;
-  border-bottom: 0;
 }
 
-.weekly-time-matrix thead tr:last-child th {
+.weekly-time-invoice .weekly-time-matrix thead tr:last-child th {
   padding-top: 1px;
 }
 
-.weekly-time-matrix th:first-child {
+.weekly-time-invoice .weekly-time-matrix .weekly-service-column {
   width: 19%;
-  text-align: left;
 }
 
-.weekly-time-matrix tbody th {
+.weekly-time-invoice .weekly-time-matrix .weekly-day-column {
+  width: calc(81% / 7);
+}
+
+.weekly-time-invoice .weekly-time-matrix tbody th,
+.weekly-time-invoice .weekly-time-matrix tbody td {
+  border: 1px dotted #b8bfca;
+}
+
+.weekly-time-invoice .weekly-time-matrix tbody th {
   font-size: 8px;
   font-weight: 600;
+  text-align: right;
+}
+
+.weekly-time-invoice .weekly-time-matrix tbody td {
+  text-align: center;
 }
 
 .decorative-rail {
@@ -554,6 +578,56 @@
     margin: 0;
     border-radius: 0;
     box-shadow: none;
+  }
+
+  .invoice-page.weekly-time-invoice {
+    box-sizing: border-box;
+    height: 11in;
+    min-height: 11in;
+  }
+
+  .weekly-time-invoice .brand-header {
+    min-height: 0.82in;
+  }
+
+  .weekly-time-invoice .invoice-information {
+    margin-bottom: 0.25in;
+  }
+
+  .weekly-time-invoice .invoice-identity {
+    padding-top: 10px;
+    padding-bottom: 11px;
+  }
+
+  .weekly-time-invoice .weekly-time-region {
+    margin-top: 14px;
+    margin-bottom: 0;
+  }
+
+  .weekly-time-invoice .weekly-time-matrix th,
+  .weekly-time-invoice .weekly-time-matrix td {
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+
+  .weekly-time-invoice .invoice-items th,
+  .weekly-time-invoice .invoice-items td {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .weekly-time-invoice .invoice-summary {
+    margin-top: 12px;
+  }
+
+  .weekly-time-invoice .invoice-summary dl > div {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .weekly-time-invoice .invoice-ending {
+    flex: 0 0 auto;
+    padding-top: 20px;
   }
 
   .invoice-items thead {

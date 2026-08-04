@@ -2,11 +2,13 @@ import {
   ARTISAN_CATEGORIES,
   ARTISAN_DESCRIPTION,
   ARTISAN_PROJECT,
+  ARTISAN_SERVICE_DESCRIPTION,
   ARTISAN_TAGS,
   ARTISAN_TIMEZONE,
   DISCOUNT_BASIS_POINTS,
   QUARTER_SECONDS,
   STANDARD_RATE_CENTS,
+  normalizeArtisanDescription,
   type ArtisanCategory,
 } from './config'
 import { localDateAt, splitAcrossLocalDates, weekStartForDate } from './dates'
@@ -40,7 +42,10 @@ function blocker(entryId: string, code: string, message: string): ReviewMessage 
 function validateEntry(entry: TogglDetailedEntry): { blockers: ReviewMessage[]; category: ArtisanCategory | null } {
   const blockers: ReviewMessage[] = []
   if (entry.project !== ARTISAN_PROJECT) blockers.push(blocker(entry.id, 'wrong-project', `Expected project “${ARTISAN_PROJECT}”; received ${JSON.stringify(entry.project)}`))
-  if (entry.description !== ARTISAN_DESCRIPTION) blockers.push(blocker(entry.id, 'wrong-description', `Expected description “${ARTISAN_DESCRIPTION}”; received ${JSON.stringify(entry.description)}`))
+  if (
+    !entry.description ||
+    normalizeArtisanDescription(entry.description) !== normalizeArtisanDescription(ARTISAN_DESCRIPTION)
+  ) blockers.push(blocker(entry.id, 'wrong-description', `Expected description “${ARTISAN_DESCRIPTION}”; received ${JSON.stringify(entry.description)}`))
   const matches = entry.tags.filter((tag) => recognizedTags.has(tag))
   if (matches.length === 0) blockers.push(blocker(entry.id, 'missing-artisan-tag', 'Entry has no recognized Artisan tag'))
   if (matches.length > 1) blockers.push(blocker(entry.id, 'conflicting-artisan-tags', `Entry has multiple recognized Artisan tags: ${matches.join(', ')}`))
@@ -85,7 +90,7 @@ function baseInvoice(week: BillingWeek, quarterUnits: number, cells: GroupedCell
     },
     lineItems: [{
       id: `artisan-services-${week.from}`,
-      description: `Professional services — ${formattedPeriod(week.from, week.through)}`,
+      description: `${ARTISAN_SERVICE_DESCRIPTION} — ${formattedPeriod(week.from, week.through)}`,
       quantity: quarterUnits / 4,
       quantityQuarterUnits: quarterUnits,
       unitPriceCents: STANDARD_RATE_CENTS,

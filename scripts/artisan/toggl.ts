@@ -1,6 +1,55 @@
 import type { TogglDetailedEntry } from '../../src/artisan/types.ts'
 
 const REPORTS_BASE = 'https://api.track.toggl.com/reports/api/v3/workspace'
+const MAX_ERROR_BODY_CHARACTERS = 2_000
+
+function redactSecrets(body: string, secrets: string[]): string {
+  let redacted = body
+  for (const secret of secrets) {
+    if (secret.length > 0) redacted = redacted.replaceAll(secret, '[REDACTED]')
+  }
+  return redacted
+    .replace(/Basic\s+[A-Za-z0-9+/=_-]+/gi, 'Basic [REDACTED]')
+    .replace(
+      /(["']?(?:authorization|api[_-]?token|access[_-]?token|password|secret)["']?\s*[:=]\s*)(["'])[^"']*\2/gi,
+      '$1$2[REDACTED]$2',
+    )
+}
+
+async function boundedErrorBody(response: Response, secrets: string[]): Promise<string> {
+  let body: string
+  try {
+    body = await response.text()
+  } catch {
+    return '<unavailable>'
+  }
+  if (body.length === 0) return '<empty>'
+  const redacted = redactSecrets(body, secrets)
+  if (redacted.length <= MAX_ERROR_BODY_CHARACTERS) return redacted
+  return `${redacted.slice(0, MAX_ERROR_BODY_CHARACTERS)}… [truncated]`
+}
+
+export function togglAuthorization(token: string): string {
+  return `Basic ${Buffer.from(`${token}:api_token`).toString('base64')}`
+}
+
+export async function assertTogglResponseOk(
+  response: Response,
+  context: string,
+  token: string,
+  authorization: string,
+): Promise<void> {
+  if (response.ok) return
+  const responseBody = await boundedErrorBody(response, [token, authorization])
+  const quotaRemaining = response.headers.get('x-toggl-quota-remaining') ?? '<unavailable>'
+  const quotaResetsIn = response.headers.get('x-toggl-quota-resets-in') ?? '<unavailable>'
+  throw new Error([
+    `${context} failed with HTTP ${response.status}`,
+    `response body: ${responseBody}`,
+    `X-Toggl-Quota-Remaining: ${quotaRemaining}`,
+    `X-Toggl-Quota-Resets-In: ${quotaResetsIn}`,
+  ].join('; '))
+}
 
 function stringOrNull(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null
@@ -61,7 +110,7 @@ export async function fetchDetailedEntries(options: {
   fetchImpl?: typeof fetch
 }): Promise<TogglDetailedEntry[]> {
   const fetchImpl = options.fetchImpl ?? fetch
-  const authorization = `Basic ${Buffer.from(`${options.token}:api_token`).toString('base64')}`
+  const authorization = togglAuthorization(options.token)
   const entries: TogglDetailedEntry[] = []
   let firstId: number | undefined
   let firstRowNumber: number | undefined
@@ -88,7 +137,7 @@ export async function fetchDetailedEntries(options: {
       headers: { Authorization: authorization, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    if (!response.ok) throw new Error(`Toggl detailed report failed with HTTP ${response.status}`)
+    await assertTogglResponseOk(response, 'Toggl detailed report', options.token, authorization)
     entries.push(...normalizeDetailedResponse(await response.json()))
 
     const nextIdHeader = response.headers.get('x-next-id')

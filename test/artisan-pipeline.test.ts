@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { createBillingWeeks } from '../src/artisan/batch.ts'
-import { ARTISAN_TAGS, STANDARD_RATE_CENTS } from '../src/artisan/config.ts'
+import { ARTISAN_DESCRIPTION, ARTISAN_PROJECT, ARTISAN_SERVICE_DESCRIPTION, ARTISAN_TAGS, STANDARD_RATE_CENTS } from '../src/artisan/config.ts'
 import { localDateAt, localMidnightInstant, splitAcrossLocalDates, weekStartForDate } from '../src/artisan/dates.ts'
 import { buildWeeklyPreviews } from '../src/artisan/pipeline.ts'
 import type { TogglDetailedEntry } from '../src/artisan/types.ts'
@@ -88,6 +88,17 @@ test('calculates each quarter at $30 subtotal and $15 after discount using cents
   assert.equal(calculateSubtotal(preview.invoice.lineItems), 3_000)
   assert.equal(calculateDiscount(preview.invoice), 1_500)
   assert.equal(calculateTotal(preview.invoice), 1_500)
+})
+
+test('uses the client-configured service description while retaining source metadata internally', () => {
+  const { previews } = buildWeeklyPreviews([valid()], createBillingWeeks('2026-07-05', '2026-07-11', '000703'), sampleInvoice.sender)
+  const preview = previews[0]
+  assert.equal(ARTISAN_SERVICE_DESCRIPTION, 'Creative Direction')
+  assert.equal(preview.invoice.lineItems[0].description, 'Creative Direction — July 5, 2026 – July 11, 2026')
+  assert.equal(preview.invoice.weeklyTimeWorklog?.project, ARTISAN_PROJECT)
+  assert.equal(preview.invoice.weeklyTimeWorklog?.description, ARTISAN_DESCRIPTION)
+  assert.equal(preview.audit.entries[0].project, ARTISAN_PROJECT)
+  assert.equal(preview.audit.entries[0].description, ARTISAN_DESCRIPTION)
 })
 
 test('leaves the standard invoice data path unchanged', () => {

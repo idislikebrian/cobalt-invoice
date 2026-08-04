@@ -1,0 +1,97 @@
+{
+  "workspace": { "id": 12345, "name": "PRACTICE" },
+  "projects": [
+    { "id": 101, "workspace_id": 12345, "name": "Work/Career" },
+    { "id": 102, "workspace_id": 12345, "name": "Another Project" }
+  ],
+  "tags": [
+    { "id": 201, "workspace_id": 12345, "name": "AB - Dev" },
+    { "id": 202, "workspace_id": 12345, "name": "AB - Meeting" },
+    { "id": 203, "workspace_id": 12345, "name": "AB - Video" },
+    { "id": 204, "workspace_id": 12345, "name": "AB - Admin" },
+    { "id": 205, "workspace_id": 12345, "name": "AB - Design" },
+    { "id": 299, "workspace_id": 12345, "name": "Internal" }
+  ],
+  "timeEntries": [
+    {
+      "id": 301,
+      "workspace_id": 12345,
+      "project_id": 101,
+      "description": "Cobalt -- Production",
+      "tag_ids": [201],
+      "start": "2026-07-05T04:00:00.000Z",
+      "stop": "2026-07-05T04:15:00.000Z",
+      "duration": 900
+    },
+    {
+      "id": 302,
+      "workspace_id": 12345,
+      "project_id": 101,
+      "description": "Cobalt -- Production",
+      "tags": ["AB - Design", "Internal"],
+      "start": "2026-07-06T13:00:00.000Z",
+      "stop": "2026-07-06T14:00:00.000Z",
+      "duration": 3600
+    },
+    {
+      "id": 303,
+      "workspace_id": 12345,
+      "project_id": 102,
+      "description": "Cobalt -- Production",
+      "tag_ids": [201],
+      "start": "2026-07-06T13:00:00.000Z",
+      "stop": "2026-07-06T14:00:00.000Z",
+      "duration": 3600
+    },
+    {
+      "id": 304,
+      "workspace_id": 12345,
+      "project_id": 101,
+      "description": "Different description",
+      "tag_ids": [201],
+      "start": "2026-07-06T13:00:00.000Z",
+      "stop": "2026-07-06T14:00:00.000Z",
+      "duration": 3600
+    },
+    {
+      "id": 305,
+      "workspace_id": 12345,
+      "project_id": 101,
+      "description": "Cobalt -- Production",
+      "tag_ids": [201],
+      "start": "2026-07-07T13:00:00.000Z",
+      "stop": null,
+      "duration": -1750000000
+    },
+    {
+      "id": 306,
+      "workspace_id": 12345,
+      "project_id": 101,
+      "description": "Cobalt -- Production",
+      "tag_ids": [201],
+      "start": "2026-07-12T04:00:00.000Z",
+      "stop": "2026-07-12T04:15:00.000Z",
+      "duration": 900
+    },
+    {
+      "id": 307,
+      "workspace_id": 99999,
+      "project_id": 101,
+      "description": "Cobalt -- Production",
+      "tag_ids": [201],
+      "start": "2026-07-08T13:00:00.000Z",
+      "stop": "2026-07-08T14:00:00.000Z",
+      "duration": 3600
+    },
+    {
+      "id": 308,
+      "workspace_id": 12345,
+      "project_id": 101,
+      "description": "Cobalt -- Production",
+      "tag_ids": [201, 205],
+      "start": "2026-07-09T13:00:00.000Z",
+      "stop": "2026-07-09T14:00:00.000Z",
+      "duration": 3600
+    }
+  ]
+}

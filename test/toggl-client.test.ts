@@ -31,3 +31,43 @@ test('paginates detailed reports with both Toggl cursors and never serializes th
   assert.equal(JSON.stringify(bodies).includes('fixture-secret-token'), false)
   assert.match(String((headers[0] as Record<string, string>).Authorization), /^Basic /)
 })
+
+test('reports bounded, useful 402 diagnostics without exposing credentials', async () => {
+  const token = 'fixture-secret-token'
+  const authorization = `Basic ${Buffer.from(`${token}:api_token`).toString('base64')}`
+  const responseBody = JSON.stringify({
+    error: 'Payment required for detailed reports',
+    api_token: token,
+    authorization,
+    detail: 'x'.repeat(4_000),
+  })
+  const fetchImpl: typeof fetch = async () => new Response(responseBody, {
+    status: 402,
+    headers: {
+      'X-Toggl-Quota-Remaining': '17',
+      'X-Toggl-Quota-Resets-In': '42',
+    },
+  })
+
+  await assert.rejects(
+    fetchDetailedEntries({
+      workspaceId: 'fixture-workspace',
+      token,
+      from: '2026-07-05',
+      through: '2026-07-11',
+      fetchImpl,
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error)
+      assert.match(error.message, /HTTP 402/)
+      assert.match(error.message, /Payment required for detailed reports/)
+      assert.match(error.message, /X-Toggl-Quota-Remaining: 17/)
+      assert.match(error.message, /X-Toggl-Quota-Resets-In: 42/)
+      assert.match(error.message, /\[truncated\]/)
+      assert.equal(error.message.includes(token), false)
+      assert.equal(error.message.includes(authorization), false)
+      assert.ok(error.message.length < 2_500)
+      return true
+    },
+  )
+})
