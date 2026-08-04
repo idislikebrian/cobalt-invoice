@@ -7,6 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
   globalIgnores(['dist']),
+  globalIgnores(['output', 'graphify-out']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -18,5 +19,9 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+  },
+  {
+    files: ['scripts/**/*.ts', 'test/**/*.ts'],
+    languageOptions: { globals: globals.node },
   },
 ])

@@ -29,6 +29,57 @@ const COBALT_WORDMARK = `░░      ░░░      ░░       ░░░      
 const QR_MESSAGE = 'Thank you for your business'
 const RAIL_MARKS = Array.from({ length: 16 }, (_, index) => index)
 const RAIL_MIN_OPACITY = 0.1
+const WEEKLY_CATEGORIES = ['ADMIN', 'DESIGN', 'DEV', 'MEETINGS', 'VIDEO'] as const
+const WEEKDAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+
+function formatQuarterHours(quarterUnits: number): string {
+  if (quarterUnits === 0) return '–'
+  const whole = Math.floor(quarterUnits / 4)
+  const remainder = quarterUnits % 4
+  return `${whole}${['', '.25', '.5', '.75'][remainder]}`
+}
+
+function formatMatrixDate(isoDate: string): string {
+  const [, month, day] = isoDate.split('-')
+  return `${Number(month)}/${Number(day)}`
+}
+
+function WeeklyTimeWorklog({ worklog }: { worklog: NonNullable<InvoiceData['weeklyTimeWorklog']> }) {
+  const cellUnits = new Map(
+    worklog.cells.map((cell) => [`${cell.date}:${cell.category}`, cell.roundedQuarterUnits]),
+  )
+
+  return (
+    <section className="weekly-time-region" aria-label="Weekly time detail">
+      <div className="weekly-source">
+        <span><strong>Project:</strong> {worklog.project}</span>
+        <span><strong>Description:</strong> {worklog.description}</span>
+      </div>
+      <table className="weekly-time-matrix">
+        <thead>
+          <tr>
+            <th aria-label="Category" />
+            {worklog.dates.map((date) => <th key={date}>{formatMatrixDate(date)}</th>)}
+          </tr>
+          <tr>
+            <th scope="col">Service</th>
+            {WEEKDAY_LABELS.map((day) => <th scope="col" key={day}>{day}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {WEEKLY_CATEGORIES.map((category) => (
+            <tr key={category}>
+              <th scope="row">{category}</th>
+              {worklog.dates.map((date) => (
+                <td key={date}>{formatQuarterHours(cellUnits.get(`${date}:${category}`) ?? 0)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  )
+}
 
 function PartyDetails({ party, nameOrder }: PartyDetailsProps) {
   const primaryName =
@@ -82,7 +133,8 @@ export function Invoice({ invoice }: InvoiceProps) {
   const hasZelle = Boolean(invoice.paymentDetails?.zellePhone)
 
   return (
-    <main className="invoice-page" aria-label={`Invoice ${invoice.invoiceNumber}`}>
+    <main className={`invoice-page${invoice.template === 'weekly-time' ? ' weekly-time-invoice' : ''}`} aria-label={`Invoice ${invoice.invoiceNumber}`}>
+      {invoice.template === 'weekly-time' && <div className="draft-watermark" aria-label="Preview draft">DRAFT · PREVIEW</div>}
       <div className="decorative-rail" aria-hidden="true">
         {RAIL_MARKS.map((mark) => (
           <span
@@ -158,6 +210,9 @@ export function Invoice({ invoice }: InvoiceProps) {
       </section>
 
       <div className="invoice-commerce-area">
+        {invoice.template === 'weekly-time' && invoice.weeklyTimeWorklog && (
+          <WeeklyTimeWorklog worklog={invoice.weeklyTimeWorklog} />
+        )}
         <div className="invoice-items-group">
           <div className="line-items-region">
             <table className="invoice-items">
@@ -200,7 +255,7 @@ export function Invoice({ invoice }: InvoiceProps) {
               <dd>{formatCurrency(subtotal, invoice.currency)}</dd>
             </div>
             <div>
-              <dt>Discount</dt>
+              <dt>{invoice.discount?.label ?? 'Discount'}</dt>
               <dd>
                 {discount > 0
                   ? `−${formatCurrency(discount, invoice.currency)}`

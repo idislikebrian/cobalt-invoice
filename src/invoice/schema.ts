@@ -49,24 +49,55 @@ export const lineItemSchema = z.object({
   id: z.string().min(1),
   description: z.string().min(1),
   detail: z.string().min(1).optional(),
-  quantity: z.number().positive(),
+  quantity: z.number().nonnegative(),
+  quantityQuarterUnits: z.number().int().nonnegative().optional(),
   unitPriceCents: z.number().int().nonnegative(),
+}).superRefine(({ quantity, quantityQuarterUnits }, context) => {
+  if (
+    quantityQuarterUnits !== undefined &&
+    quantity !== quantityQuarterUnits / 4
+  ) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Quantity must equal quantityQuarterUnits / 4',
+      path: ['quantity'],
+    })
+  }
+})
+
+const weeklyTimeCellSchema = z.object({
+  date: isoDateSchema,
+  category: z.enum(['ADMIN', 'DESIGN', 'DEV', 'MEETINGS', 'VIDEO']),
+  roundedQuarterUnits: z.number().int().nonnegative(),
+})
+
+const weeklyTimeWorklogSchema = z.object({
+  timezone: z.literal('America/New_York'),
+  periodStart: isoDateSchema,
+  periodEnd: isoDateSchema,
+  dates: z.array(isoDateSchema).length(7),
+  project: z.string().min(1),
+  description: z.string().min(1),
+  cells: z.array(weeklyTimeCellSchema),
 })
 
 export const discountSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('fixed'),
     amountCents: z.number().int().positive(),
+    label: z.string().min(1).optional(),
   }).strict(),
   z.object({
     type: z.literal('percentage'),
     rateBasisPoints: z.number().int().positive().max(10000),
+    label: z.string().min(1).optional(),
   }).strict(),
 ])
 
 export const invoiceSchema = z
   .object({
     invoiceNumber: z.string().min(1),
+    template: z.enum(['standard', 'weekly-time']).optional(),
     status: z.enum(['draft', 'finalized', 'sent', 'paid', 'overdue', 'void']),
     issueDate: isoDateSchema,
     dueDate: isoDateSchema,
@@ -80,6 +111,7 @@ export const invoiceSchema = z
     discount: discountSchema.optional(),
     salesTaxRateBasisPoints: z.number().int().positive().max(10000).optional(),
     amountPaidCents: z.number().int().nonnegative().optional(),
+    weeklyTimeWorklog: weeklyTimeWorklogSchema.optional(),
   })
   .refine(({ dueDate, issueDate }) => dueDate >= issueDate, {
     message: 'Due date must be on or after the issue date',
@@ -100,6 +132,23 @@ export const invoiceSchema = z
         code: 'custom',
         message: 'Fixed discount cannot exceed the invoice subtotal',
         path: ['discount', 'amountCents'],
+      })
+    }
+  })
+  .superRefine(({ template, weeklyTimeWorklog }, context) => {
+    if (template === 'weekly-time' && !weeklyTimeWorklog) {
+      context.addIssue({
+        code: 'custom',
+        message: 'weekly-time invoices require weeklyTimeWorklog',
+        path: ['weeklyTimeWorklog'],
+      })
+    }
+
+    if (template !== 'weekly-time' && weeklyTimeWorklog) {
+      context.addIssue({
+        code: 'custom',
+        message: 'weeklyTimeWorklog is only valid for weekly-time invoices',
+        path: ['weeklyTimeWorklog'],
       })
     }
   })

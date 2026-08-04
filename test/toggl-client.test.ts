@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import { fetchDetailedEntries, normalizeDetailedResponse } from '../scripts/artisan/toggl.ts'
+
+test('flattens current detailed-report rows with nested time entries', () => {
+  const entries = normalizeDetailedResponse([{
+    project_name: 'Work/Career', description: 'Cobalt -- Production', tag_names: ['AB - Video'],
+    time_entries: [{ id: 44, start: '2026-07-07T13:00:00Z', stop: '2026-07-07T13:15:00Z', seconds: 900 }],
+  }])
+  assert.deepEqual(entries, [{
+    id: '44', start: '2026-07-07T13:00:00Z', stop: '2026-07-07T13:15:00Z', seconds: 900,
+    project: 'Work/Career', description: 'Cobalt -- Production', tags: ['AB - Video'],
+  }])
+})
+
+test('paginates detailed reports with both Toggl cursors and never serializes the token', async () => {
+  const bodies: Array<Record<string, unknown>> = []
+  const headers: Array<HeadersInit | undefined> = []
+  const pages = [
+    new Response(JSON.stringify([{ time_entry_id: 1, start: '2026-07-06T13:00:00Z', stop: '2026-07-06T14:00:00Z', seconds: 3600, project: 'Work/Career', description: 'Cobalt -- Production', tags: ['AB - Dev'] }]), { headers: { 'x-next-id': '8', 'x-next-row-number': '101' } }),
+    new Response(JSON.stringify([{ time_entry_id: 2, start: '2026-07-06T14:00:00Z', stop: '2026-07-06T15:00:00Z', seconds: 3600, project: 'Work/Career', description: 'Cobalt -- Production', tags: ['AB - Design'] }]))
+  ]
+  const fetchImpl: typeof fetch = async (_input, init) => {
+    bodies.push(JSON.parse(String(init?.body)))
+    headers.push(init?.headers)
+    return pages.shift()!
+  }
+  const entries = await fetchDetailedEntries({ workspaceId: 'fixture-workspace', token: 'fixture-secret-token', from: '2026-07-05', through: '2026-07-11', fetchImpl })
+  assert.equal(entries.length, 2)
+  assert.deepEqual({ first_id: bodies[1].first_id, first_row_number: bodies[1].first_row_number }, { first_id: 8, first_row_number: 101 })
+  assert.equal(JSON.stringify(bodies).includes('fixture-secret-token'), false)
+  assert.match(String((headers[0] as Record<string, string>).Authorization), /^Basic /)
+})

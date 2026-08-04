@@ -1,6 +1,10 @@
 import type { InvoiceData, InvoiceLineItem } from './schema'
 
 export function calculateLineItemTotal(item: InvoiceLineItem): number {
+  if (item.quantityQuarterUnits !== undefined) {
+    return Math.round((item.quantityQuarterUnits * item.unitPriceCents) / 4)
+  }
+
   return Math.round(item.quantity * item.unitPriceCents)
 }
 

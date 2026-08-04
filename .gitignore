@@ -13,6 +13,9 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+output/
+graphify-out/
+tmp/pdfs/
 *.local
 
 # Editor directories and files

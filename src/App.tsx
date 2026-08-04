@@ -1,5 +1,6 @@
 import { Invoice } from './invoice/Invoice'
 import { sampleInvoice } from './invoice/sample-invoice'
+import { invoiceSchema } from './invoice/schema'
 
 const environmentPaymentDetails = {
   bankName: import.meta.env.VITE_PAYMENT_BANK_NAME,
@@ -14,8 +15,19 @@ const hasPaymentDetails = Object.values(environmentPaymentDetails).some(
   (value) => value !== undefined && value !== '',
 )
 
+const encodedInvoice = new URLSearchParams(window.location.search).get('invoice')
+const paddedInvoice = encodedInvoice
+  ? encodedInvoice.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(encodedInvoice.length / 4) * 4, '=')
+  : null
+const decodedInvoice = paddedInvoice
+  ? new TextDecoder().decode(Uint8Array.from(atob(paddedInvoice), (character) => character.charCodeAt(0)))
+  : null
+const suppliedInvoice = encodedInvoice
+  ? invoiceSchema.parse(JSON.parse(decodedInvoice!))
+  : sampleInvoice
+
 const previewInvoice = {
-  ...sampleInvoice,
+  ...suppliedInvoice,
   ...(hasPaymentDetails && { paymentDetails: environmentPaymentDetails }),
 }
 
