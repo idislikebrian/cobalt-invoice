@@ -10,14 +10,6 @@ import {
 import { invoiceSchema, type InvoiceData } from '../../src/invoice/schema.ts'
 import type { WeeklyAudit } from '../../src/artisan/types.ts'
 
-export const ARTISAN_FINAL_INVOICE_NUMBERS = [
-  '000702',
-  '000703',
-  '000704',
-  '000705',
-  '000706',
-] as const
-
 const reviewMessageSchema = z.object({
   code: z.string(),
   entryId: z.string().nullable(),
@@ -127,12 +119,12 @@ async function existingFinalNumbers(finalRoot: string): Promise<Set<string>> {
   return found
 }
 
-export function assertExplicitInvoiceNumbers(invoiceNumbers: string[]): void {
+export function assertExplicitInvoiceNumbers(invoiceNumbers: string[], previewInvoiceNumbers: string[]): void {
   if (
-    invoiceNumbers.length !== ARTISAN_FINAL_INVOICE_NUMBERS.length ||
-    invoiceNumbers.some((value, index) => value !== ARTISAN_FINAL_INVOICE_NUMBERS[index])
+    invoiceNumbers.length !== previewInvoiceNumbers.length ||
+    invoiceNumbers.some((value, index) => value !== previewInvoiceNumbers[index])
   ) {
-    throw new Error(`Explicitly confirm invoice numbers in this order: ${ARTISAN_FINAL_INVOICE_NUMBERS.join(',')}`)
+    throw new Error(`Explicitly confirm invoice numbers in this order: ${previewInvoiceNumbers.join(',')}`)
   }
 }
 
@@ -148,8 +140,6 @@ export async function validateFinalizationSource(options: {
     throw new Error(`Preview directory is missing: ${previewDirectory}`)
   }
 
-  assertExplicitInvoiceNumbers(options.invoiceNumbers)
-
   let manifestRaw: string
   try {
     manifestRaw = await readFile(path.join(previewDirectory, 'preview-manifest.json'), 'utf8')
@@ -159,9 +149,7 @@ export async function validateFinalizationSource(options: {
   const manifestResult = previewManifestSchema.safeParse(parseJson(manifestRaw, 'preview-manifest.json'))
   if (!manifestResult.success) throw new Error('preview-manifest.json is missing or malformed')
   const manifest = manifestResult.data
-  if (manifest.invoiceNumbers.join(',') !== options.invoiceNumbers.join(',')) {
-    throw new Error('Expected invoice numbers are absent from the preview manifest')
-  }
+  assertExplicitInvoiceNumbers(options.invoiceNumbers, manifest.invoiceNumbers)
 
   const duplicateNumbers = await existingFinalNumbers(path.resolve(options.finalRoot))
   const duplicate = options.invoiceNumbers.find((number) => duplicateNumbers.has(number))

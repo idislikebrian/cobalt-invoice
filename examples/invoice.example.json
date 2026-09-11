@@ -1,0 +1,61 @@
+{
+  "invoiceNumber": "EXAMPLE-001",
+  "status": "draft",
+  "issueDate": "2026-01-15",
+  "dueDate": "2026-02-14",
+  "currency": "USD",
+  "sender": {
+    "name": "Example Sender",
+    "businessName": "Example Studio",
+    "email": "billing@example.test",
+    "address": {
+      "line1": "123 Example Street",
+      "city": "Example City",
+      "region": "NY",
+      "postalCode": "10000",
+      "country": "USA"
+    },
+    "footer": {
+      "companyAddress": "123 Example Street, Example City, NY 10000",
+      "websiteLabel": "example.test",
+      "websiteUrl": "https://example.test",
+      "phoneLabel": "+1 555.0100",
+      "phoneHref": "tel:+15550100",
+      "socialLabel": "I: @example",
+      "generalEmail": "hello@example.test",
+      "contactName": "Example Contact",
+      "contactEmail": "contact@example.test"
+    }
+  },
+  "client": {
+    "name": "Example Client",
+    "businessName": "Example Client LLC",
+    "email": "accounts@example-client.test",
+    "address": {
+      "line1": "456 Sample Avenue",
+      "city": "Sample City",
+      "region": "CA",
+      "postalCode": "90000",
+      "country": "USA"
+    }
+  },
+  "lineItems": [
+    {
+      "id": "example-service",
+      "description": "Example service",
+      "quantity": 1,
+      "unitPriceCents": 299900
+    }
+  ],
+  "notes": "Example invoice data only.",
+  "paymentInstructions": "Example payment instructions.",
+  "paymentDetails": {
+    "accountName": "Example Studio",
+    "accountNumber": "0000000000",
+    "routingNumber": "000000000",
+    "bankName": "Example Bank",
+    "ethereumNetwork": "Example Network",
+    "ethereumAddress": "0x0000000000000000000000000000000000000000",
+    "zellePhone": "+1 555.0100"
+  }
+}

@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "tsx --test test/*.test.ts src/invoice/calculations.test.ts",
+    "invoice:render": "node --env-file-if-exists=.env.local --import tsx scripts/invoice/render.ts",
     "invoice:artisan:preview": "node --env-file-if-exists=.env.local --import tsx scripts/artisan/preview.ts",
     "invoice:artisan:finalize": "node --env-file-if-exists=.env.local --import tsx scripts/artisan/finalize.ts",
     "preview": "vite preview"

@@ -10,17 +10,25 @@ import { createBillingWeeks } from '../src/artisan/batch.ts'
 import { buildWeeklyPreviews } from '../src/artisan/pipeline.ts'
 import { sampleInvoice } from '../src/invoice/sample-invoice.ts'
 import {
-  ARTISAN_FINAL_INVOICE_NUMBERS,
   jsonArtifact,
   sha256,
   validateFinalizationSource,
   type PreviewManifest,
 } from '../scripts/artisan/finalization.ts'
 
+const DEFAULT_INVOICE_NUMBERS = [
+  '000702',
+  '000703',
+  '000704',
+  '000705',
+  '000706',
+] as const
+
 async function makePreviewFixture(options: { blocker?: boolean } = {}): Promise<{
   root: string
   previewDirectory: string
   finalRoot: string
+  invoiceNumbers: string[]
 }> {
   const root = await mkdtemp(path.join(os.tmpdir(), 'artisan-finalization-'))
   const previewDirectory = path.join(root, 'preview')
@@ -58,11 +66,16 @@ async function makePreviewFixture(options: { blocker?: boolean } = {}): Promise<
     version: 1,
     previewId: 'fixture-preview',
     createdAt: '2026-08-04T12:00:00.000Z',
-    invoiceNumbers: [...ARTISAN_FINAL_INVOICE_NUMBERS],
+    invoiceNumbers: previews.map(({ invoice }) => invoice.invoiceNumber),
     sources,
   }
   await writeFile(path.join(previewDirectory, 'preview-manifest.json'), jsonArtifact(manifest))
-  return { root, previewDirectory, finalRoot }
+  return {
+    root,
+    previewDirectory,
+    finalRoot,
+    invoiceNumbers: previews.map(({ invoice }) => invoice.invoiceNumber),
+  }
 }
 
 test('validates a complete frozen preview batch for successful finalization', async (context) => {
@@ -70,10 +83,47 @@ test('validates a complete frozen preview batch for successful finalization', as
   context.after(() => rm(fixture.root, { recursive: true, force: true }))
   const validated = await validateFinalizationSource({
     previewDirectory: fixture.previewDirectory,
-    invoiceNumbers: [...ARTISAN_FINAL_INVOICE_NUMBERS],
+    invoiceNumbers: fixture.invoiceNumbers,
     finalRoot: fixture.finalRoot,
   })
-  assert.deepEqual(validated.sources.map(({ invoiceNumber }) => invoiceNumber), ARTISAN_FINAL_INVOICE_NUMBERS)
+  assert.deepEqual(validated.sources.map(({ invoiceNumber }) => invoiceNumber), DEFAULT_INVOICE_NUMBERS)
+})
+
+test('accepts explicit invoice numbers from the frozen preview manifest', async (context) => {
+  const fixture = await makePreviewFixture()
+  context.after(() => rm(fixture.root, { recursive: true, force: true }))
+  const manifestPath = path.join(fixture.previewDirectory, 'preview-manifest.json')
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as PreviewManifest
+  const invoiceNumbers = ['000812', '000813', '000814', '000815', '000816']
+  manifest.invoiceNumbers = invoiceNumbers
+  for (const [index, source] of manifest.sources.entries()) {
+    const invoiceRaw = await readFile(path.join(fixture.previewDirectory, source.invoiceFile), 'utf8')
+    const auditRaw = await readFile(path.join(fixture.previewDirectory, source.auditFile), 'utf8')
+    const invoice = JSON.parse(invoiceRaw) as Record<string, unknown>
+    const audit = JSON.parse(auditRaw) as Record<string, unknown>
+    invoice.invoiceNumber = invoiceNumbers[index]
+    audit.invoiceNumber = invoiceNumbers[index]
+    const newInvoiceFile = `${invoiceNumbers[index]}.invoice.json`
+    const newAuditFile = `${invoiceNumbers[index]}.audit.json`
+    const newInvoiceRaw = jsonArtifact(invoice)
+    const newAuditRaw = jsonArtifact(audit)
+    await Promise.all([
+      writeFile(path.join(fixture.previewDirectory, newInvoiceFile), newInvoiceRaw),
+      writeFile(path.join(fixture.previewDirectory, newAuditFile), newAuditRaw),
+    ])
+    source.invoiceNumber = invoiceNumbers[index]
+    source.invoiceFile = newInvoiceFile
+    source.auditFile = newAuditFile
+    source.invoiceSha256 = sha256(newInvoiceRaw)
+    source.auditSha256 = sha256(newAuditRaw)
+  }
+  await writeFile(manifestPath, jsonArtifact(manifest))
+  const validated = await validateFinalizationSource({
+    previewDirectory: fixture.previewDirectory,
+    invoiceNumbers,
+    finalRoot: fixture.finalRoot,
+  })
+  assert.deepEqual(validated.sources.map(({ invoiceNumber }) => invoiceNumber), invoiceNumbers)
 })
 
 test('fails closed for a missing preview directory or artifact', async (context) => {
@@ -82,7 +132,7 @@ test('fails closed for a missing preview directory or artifact', async (context)
   await assert.rejects(
     validateFinalizationSource({
       previewDirectory: path.join(fixture.root, 'missing'),
-      invoiceNumbers: [...ARTISAN_FINAL_INVOICE_NUMBERS],
+      invoiceNumbers: fixture.invoiceNumbers,
       finalRoot: fixture.finalRoot,
     }),
     /Preview directory is missing/,
@@ -91,7 +141,7 @@ test('fails closed for a missing preview directory or artifact', async (context)
   await assert.rejects(
     validateFinalizationSource({
       previewDirectory: fixture.previewDirectory,
-      invoiceNumbers: [...ARTISAN_FINAL_INVOICE_NUMBERS],
+      invoiceNumbers: fixture.invoiceNumbers,
       finalRoot: fixture.finalRoot,
     }),
     /artifact is missing/,
@@ -104,7 +154,7 @@ test('fails closed when an audit contains blockers', async (context) => {
   await assert.rejects(
     validateFinalizationSource({
       previewDirectory: fixture.previewDirectory,
-      invoiceNumbers: [...ARTISAN_FINAL_INVOICE_NUMBERS],
+      invoiceNumbers: fixture.invoiceNumbers,
       finalRoot: fixture.finalRoot,
     }),
     /has 1 blocker/,
@@ -119,7 +169,7 @@ test('fails closed when a frozen invoice snapshot is tampered', async (context) 
   await assert.rejects(
     validateFinalizationSource({
       previewDirectory: fixture.previewDirectory,
-      invoiceNumbers: [...ARTISAN_FINAL_INVOICE_NUMBERS],
+      invoiceNumbers: fixture.invoiceNumbers,
       finalRoot: fixture.finalRoot,
     }),
     /differs from its recorded preview snapshot/,
@@ -134,14 +184,14 @@ test('fails closed when any requested invoice already has a final PDF', async (c
   await assert.rejects(
     validateFinalizationSource({
       previewDirectory: fixture.previewDirectory,
-      invoiceNumbers: [...ARTISAN_FINAL_INVOICE_NUMBERS],
+      invoiceNumbers: fixture.invoiceNumbers,
       finalRoot: fixture.finalRoot,
     }),
     /already exists for invoice 000705/,
   )
 })
 
-test('requires explicit confirmation of all five invoice numbers', async (context) => {
+test('requires explicit confirmation of all invoice numbers in the frozen preview manifest', async (context) => {
   const fixture = await makePreviewFixture()
   context.after(() => rm(fixture.root, { recursive: true, force: true }))
   await assert.rejects(
@@ -159,7 +209,7 @@ test('PDF extraction keeps Draft indicators in previews and removes both from fi
   context.after(() => rm(fixture.root, { recursive: true, force: true }))
   const validated = await validateFinalizationSource({
     previewDirectory: fixture.previewDirectory,
-    invoiceNumbers: [...ARTISAN_FINAL_INVOICE_NUMBERS],
+    invoiceNumbers: fixture.invoiceNumbers,
     finalRoot: fixture.finalRoot,
   })
   const vite = await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' })

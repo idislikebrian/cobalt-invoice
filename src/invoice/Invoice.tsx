@@ -181,7 +181,9 @@ export function Invoice({ invoice, renderMode = 'preview' }: InvoiceProps) {
               invoice.client.phone ||
               invoice.client.billingNote) && (
               <div className="information-secondary">
-                {invoice.client.email && <span>{invoice.client.email}</span>}
+                {invoice.client.email && (
+                  <span className="information-email">{invoice.client.email}</span>
+                )}
                 {invoice.client.phone && <span>{invoice.client.phone}</span>}
                 {invoice.client.billingNote && (
                   <span>{invoice.client.billingNote}</span>
