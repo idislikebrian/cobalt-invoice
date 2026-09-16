@@ -108,6 +108,60 @@ explicit invoice JSON
 
 Malformed invoice data is rejected. Existing PDF outputs are not overwritten by default.
 
+### Guarded generic workflow
+
+The shared OpenClaw skill uses the guarded generic workflow instead of choosing
+output paths directly. On the canonical installation, run:
+
+```sh
+npm run invoice:generic -- inspect --invoice-number 000700 --json
+npm run invoice:generic -- validate --input /path/to/candidate.json --json
+npm run invoice:generic -- prepare --source /path/to/candidate.json --key client-000700 --json
+npm run invoice:generic -- preview --input /srv/cobalt-invoice/runtime/input/invoices/client-000700.json --json
+npm run invoice:generic -- finalize --preview-id generic-000700-<hash> --invoice-number 000700 --json
+npm run invoice:generic -- report --invoice-number 000700 --json
+```
+
+The guarded workflow uses these fixed runtime locations:
+
+```text
+/srv/cobalt-invoice/runtime/input/invoices/
+/srv/cobalt-invoice/runtime/output/previews/<preview-id>/
+/srv/cobalt-invoice/runtime/output/final/<finalization-id>/
+/srv/cobalt-invoice/runtime/state/invoice-studio/
+```
+
+`inspect`, `validate`, and `report` are read-only. `prepare`, `preview`,
+and `finalize` are explicit mutations:
+
+* `prepare` validates a draft and creates a new canonical input without
+  overwriting an existing file or reusing an invoice number.
+* `preview` freezes the validated draft, renders it through
+  `invoice:render --mode preview`, and records source, snapshot, and PDF
+  hashes.
+* `finalize` requires the exact preview ID and invoice number. It verifies the
+  frozen preview and unchanged source, promotes only the frozen snapshot to
+  `finalized`, and renders it through `invoice:render --mode final`.
+* `report` recomputes the final PDF hash and verifies it against the
+  finalization manifest. A single legacy PDF can also be reported, marked as
+  unverified by a managed manifest.
+
+Preview and finalization artifacts are content-addressed and committed through
+same-filesystem staging directories. A retry of the exact same operation
+returns the already verified artifact. Conflicting or malformed state fails
+closed.
+
+Finalized snapshots, manifests, and PDFs are read-only. The canonical draft is
+left unchanged so a failed final render cannot leave it incorrectly marked
+finalized.
+
+Pre-workflow PDFs, such as invoice `000699`, are treated as legacy occupied
+numbers. They are not imported into the managed manifest system and can never
+be overwritten or reused.
+
+The workflow never sends email, updates Airtable, records payment, or performs
+bookkeeping. Those remain separate operations.
+
 ---
 
 ## Artisan Barber workflow

@@ -11,7 +11,8 @@
     "invoice:render": "node --env-file-if-exists=.env.local --import tsx scripts/invoice/render.ts",
     "invoice:artisan:preview": "node --env-file-if-exists=.env.local --import tsx scripts/artisan/preview.ts",
     "invoice:artisan:finalize": "node --env-file-if-exists=.env.local --import tsx scripts/artisan/finalize.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "invoice:generic": "node --import tsx scripts/invoice/generic-workflow.ts"
   },
   "dependencies": {
     "qrcode.react": "^4.2.0",
