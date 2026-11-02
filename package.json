@@ -11,6 +11,7 @@
     "invoice:render": "node --env-file-if-exists=.env.local --import tsx scripts/invoice/render.ts",
     "invoice:artisan:preview": "node --env-file-if-exists=.env.local --import tsx scripts/artisan/preview.ts",
     "invoice:artisan:finalize": "node --env-file-if-exists=.env.local --import tsx scripts/artisan/finalize.ts",
+    "invoice:artisan:canonical": "node --env-file-if-exists=.env.local --import tsx scripts/artisan/canonical-workflow.ts",
     "preview": "vite preview",
     "invoice:generic": "node --import tsx scripts/invoice/generic-workflow.ts"
   },

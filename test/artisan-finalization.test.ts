@@ -202,6 +202,28 @@ test('requires explicit confirmation of all invoice numbers in the frozen previe
     }),
     /Explicitly confirm invoice numbers/,
   )
+  await assert.rejects(
+    validateFinalizationSource({
+      previewDirectory: fixture.previewDirectory,
+      invoiceNumbers: [...fixture.invoiceNumbers, '000799'],
+      finalRoot: fixture.finalRoot,
+    }),
+    /Explicitly confirm invoice numbers/,
+  )
+})
+
+test('fails closed when a frozen invoice snapshot is missing', async (context) => {
+  const fixture = await makePreviewFixture()
+  context.after(() => rm(fixture.root, { recursive: true, force: true }))
+  await rm(path.join(fixture.previewDirectory, '000703.invoice.json'))
+  await assert.rejects(
+    validateFinalizationSource({
+      previewDirectory: fixture.previewDirectory,
+      invoiceNumbers: fixture.invoiceNumbers,
+      finalRoot: fixture.finalRoot,
+    }),
+    /snapshot or audit artifact is missing/,
+  )
 })
 
 test('PDF extraction keeps Draft indicators in previews and removes both from finals', async (context) => {
