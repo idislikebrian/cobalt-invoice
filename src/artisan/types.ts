@@ -1,4 +1,5 @@
 import type { ArtisanCategory } from './config'
+import type { AdjustmentAudit, AdjustmentSource } from './adjustments'
 import type { InvoiceData } from '../invoice/schema'
 
 export interface TogglDetailedEntry {
@@ -45,6 +46,21 @@ export interface GroupedCellAudit {
   roundedDecimalHours: string
 }
 
+/**
+ * Explicit date semantics for a weekly invoice. The document date is the date
+ * printed on the invoice; it is not evidence of finalization or sending.
+ * Finalization time is recorded in the finalization manifest, and sending is
+ * recorded outside Invoice Studio.
+ */
+export interface DocumentDatesAudit {
+  billingPeriod: { from: string; through: string }
+  documentDate: string
+  dueDate: string
+  documentDateBasis: string
+  previewGeneratedOn: string | null
+  notIssuanceEvidence: true
+}
+
 export interface WeeklyAudit {
   invoiceNumber: string
   billingPeriod: { from: string; through: string }
@@ -53,12 +69,21 @@ export interface WeeklyAudit {
   groupedCells: GroupedCellAudit[]
   weeklyRawDurationSeconds: number
   weeklyBilledDurationSeconds: number
+  /** Toggl-derived billed quarter units only (line item 1). */
   weeklyBilledQuarterUnits: number
+  /** Invoice subtotal across every line item, including any manual adjustments. */
   standardRateSubtotalCents: number
   discountCents: number
   finalTotalCents: number
   blockers: ReviewMessage[]
   warnings: ReviewMessage[]
+  /** Present only on manually adjusted invoices (see manualAdjustments). */
+  documentDates?: DocumentDatesAudit
+  /** Present only when manually approved, non-Toggl adjustments were applied. */
+  manualAdjustments?: AdjustmentAudit[]
+  adjustmentSource?: AdjustmentSource
+  adjustmentQuarterUnits?: number
+  invoiceBilledQuarterUnits?: number
 }
 
 export interface WeeklyPreview {
