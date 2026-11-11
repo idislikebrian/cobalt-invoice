@@ -152,7 +152,8 @@ export function normalizeTrackEntry(
   const start = typeof entry.start === 'string' ? entry.start : null
   const stop = typeof entry.stop === 'string' ? entry.stop : null
   const duration = typeof entry.duration === 'number' ? entry.duration : null
-  if (entryWorkspaceId !== workspaceId || !stop || !start || !duration || duration <= 0) return null
+  if (entryWorkspaceId !== workspaceId || !stop || !start || !duration || duration <= 0 ||
+      !(typeof id === 'number' || typeof id === 'string') || String(id).length === 0) return null
 
   const project = projectId === null ? null : metadata.projectNames.get(projectId) ?? null
   const directTags = Array.isArray(entry.tags)
@@ -175,7 +176,7 @@ export function normalizeTrackEntry(
   ) return null
 
   return {
-    id: typeof id === 'number' || typeof id === 'string' ? String(id) : 'missing-id',
+    id: String(id),
     start,
     stop,
     seconds: duration,
@@ -298,6 +299,17 @@ export async function fetchTrackEntries(options: {
   const entries = entriesWithRecognizedTag
     .map((entry) => normalizeTrackEntry(entry.value, parsedWorkspaceId, metadata))
     .filter((entry): entry is TogglDetailedEntry => entry !== null)
+  // The normalizer may reject a recognizable Artisan entry after the audit's
+  // earlier filters. Such entries must never disappear behind a nonzero total.
+  const candidateEntries = rawEntries
+    .map((entry) => trackEntryFacts(entry, metadata))
+    .filter((entry) => entry.workspaceId === parsedWorkspaceId && entry.project === ARTISAN_PROJECT &&
+      entry.description !== null && normalizeArtisanDescription(entry.description) === normalizeArtisanDescription(ARTISAN_DESCRIPTION) &&
+      entry.tags.some((tag) => Object.hasOwn(ARTISAN_TAGS, tag)) &&
+      (!Number.isFinite(entry.startMs) || entry.startMs < rangeEnd) &&
+      (!Number.isFinite(entry.stopMs) || entry.stopMs > rangeStart))
+  const droppedCandidates = candidateEntries.filter((entry) =>
+    !entry.completed || normalizeTrackEntry(entry.value, parsedWorkspaceId, metadata) === null)
   const relevantEntries = workspaceEntries.filter(
     (entry) => entry.description?.includes('Cobalt') || entry.tags.some((tag) => tag.startsWith('AB -')),
   )
@@ -308,6 +320,17 @@ export async function fetchTrackEntries(options: {
         message: 'The entire requested batch contains zero accepted Artisan entries; refusing to generate zero-dollar PDFs',
       }]
     : []
+  for (const candidate of droppedCandidates) {
+    const raw = objectRecord(candidate.value)
+    const recognizedTags = candidate.tags.filter((tag) => Object.hasOwn(ARTISAN_TAGS, tag))
+    const code = recognizedTags.length !== 1 ? 'ambiguous-artisan-tags' :
+      !candidate.completed ? 'invalid-artisan-time' : 'invalid-artisan-entry'
+    blockers.push({
+      code,
+      entryId: typeof raw.id === 'number' || typeof raw.id === 'string' ? String(raw.id) : null,
+      message: `Recognizable Artisan entry was excluded from billing (${code}); operator reconciliation required`,
+    })
+  }
   const configuredDescription = {
     value: ARTISAN_DESCRIPTION,
     normalizedValue: normalizeArtisanDescription(ARTISAN_DESCRIPTION),

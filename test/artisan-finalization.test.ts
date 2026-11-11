@@ -191,6 +191,21 @@ test('fails closed when any requested invoice already has a final PDF', async (c
   )
 })
 
+test('fails closed when a legacy dated final PDF occupies an invoice number', async (context) => {
+  const fixture = await makePreviewFixture()
+  context.after(() => rm(fixture.root, { recursive: true, force: true }))
+  await mkdir(fixture.finalRoot, { recursive: true })
+  await writeFile(path.join(fixture.finalRoot, '20261110-000705--artisan-barber.pdf'), 'legacy')
+  await assert.rejects(
+    validateFinalizationSource({
+      previewDirectory: fixture.previewDirectory,
+      invoiceNumbers: fixture.invoiceNumbers,
+      finalRoot: fixture.finalRoot,
+    }),
+    /already exists for invoice 000705/,
+  )
+})
+
 test('requires explicit confirmation of all invoice numbers in the frozen preview manifest', async (context) => {
   const fixture = await makePreviewFixture()
   context.after(() => rm(fixture.root, { recursive: true, force: true }))

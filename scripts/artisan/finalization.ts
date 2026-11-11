@@ -279,8 +279,10 @@ async function existingFinalNumbers(finalRoot: string): Promise<Set<string>> {
   const found = new Set<string>()
   try {
     for (const entry of await readdir(finalRoot, { recursive: true, withFileTypes: true })) {
-      if (entry.isFile() && /^\d{6}\.pdf$/.test(entry.name)) {
-        found.add(entry.name.slice(0, -4))
+      if (entry.isFile()) {
+        const managed = /^(\d{6})\.pdf$/.exec(entry.name)
+        const legacy = /^\d{8}-(\d{6})--[^/]+\.pdf$/.exec(entry.name)
+        if (managed || legacy) found.add((managed ?? legacy)![1])
       }
     }
   } catch (error) {
