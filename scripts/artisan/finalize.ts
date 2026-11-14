@@ -4,6 +4,7 @@ import process from 'node:process'
 import { chromium } from 'playwright'
 import { createServer } from 'vite'
 import {
+  defaultAdjustmentsRoot,
   jsonArtifact,
   sha256,
   validateFinalizationSource,
@@ -37,6 +38,7 @@ async function main(): Promise<void> {
     previewDirectory: args.previewDirectory,
     invoiceNumbers: args.invoiceNumbers,
     finalRoot,
+    adjustmentsRoot: defaultAdjustmentsRoot(),
   })
 
   const finalizedAt = new Date().toISOString()
@@ -97,6 +99,24 @@ async function main(): Promise<void> {
       invoiceNumber: source.invoiceNumber,
       totalCents: source.totalCents,
     })),
+    ...(validated.manifest.adjustments && {
+      // The printed document date is distinct from finalizedAt above; sending is
+      // recorded outside Invoice Studio and is never implied by this manifest.
+      documentDates: validated.sources.map((source) => ({
+        invoiceNumber: source.invoiceNumber,
+        billingPeriod: source.audit.billingPeriod,
+        documentDate: source.invoice.issueDate,
+        dueDate: source.invoice.dueDate,
+      })),
+      manualAdjustments: validated.sources
+        .filter((source) => source.manualAdjustmentIds.length > 0)
+        .map((source) => ({
+          invoiceNumber: source.invoiceNumber,
+          ids: source.manualAdjustmentIds,
+          sourceFile: validated.manifest.adjustments!.file,
+          sourceSha256: validated.manifest.adjustments!.sha256,
+        })),
+    }),
   }
   const manifestPath = path.join(outputDirectory, 'finalization-manifest.json')
   await writeFile(manifestPath, jsonArtifact(manifest), { flag: 'wx' })

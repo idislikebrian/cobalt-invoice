@@ -70,6 +70,10 @@ test('uses read-only v9 endpoints, exact filters, completed entries, and New Yor
     entriesWithAnyRecognizedTag: 3,
     acceptedEntries: 2,
   })
+  assert.deepEqual(acquisition.audit.blockers.map(({ code, entryId }) => ({ code, entryId })), [
+    { code: 'invalid-artisan-time', entryId: '305' },
+    { code: 'ambiguous-artisan-tags', entryId: '308' },
+  ])
   assert.equal(JSON.stringify(acquisition.audit).includes('Different description'), true)
   assert.equal(JSON.stringify(acquisition.audit).includes('Another Project'), false)
   assert.ok(requests.every(({ method }) => method === 'GET'))
@@ -77,6 +81,18 @@ test('uses read-only v9 endpoints, exact filters, completed entries, and New Yor
   const timeEntryRequest = requests.find(({ url }) => url.pathname.endsWith('/me/time_entries'))!
   assert.equal(timeEntryRequest.url.searchParams.get('start_date'), '2026-07-04T04:00:00.000Z')
   assert.equal(timeEntryRequest.url.searchParams.get('end_date'), '2026-07-12T04:00:00.000Z')
+})
+
+test('a malformed recognized entry cannot be silently dropped beside a valid one', async () => {
+  const timeEntries = [fixture.timeEntries[0], { ...fixture.timeEntries[0], id: 990, duration: 0 }]
+  const acquisition = await fetchTrackEntries({
+    workspaceId: '12345', token: 'fixture-token', from: '2026-07-05', through: '2026-07-11',
+    fetchImpl: trackFetch(timeEntries).fetchImpl,
+  })
+  assert.deepEqual(acquisition.entries.map(({ id }) => id), ['301'])
+  assert.deepEqual(acquisition.audit.blockers.map(({ code, entryId }) => ({ code, entryId })), [
+    { code: 'invalid-artisan-time', entryId: '990' },
+  ])
 })
 
 test('canonicalizes two hyphens, em dash, and en dash while retaining exact matching', async () => {

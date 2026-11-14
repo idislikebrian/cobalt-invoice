@@ -4,11 +4,28 @@ import { readdir, readFile, realpath } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
-import { previewManifestSchema, validateFinalizationSource } from './finalization.ts'
+import { ADJUSTMENT_FILE_NAME } from '../../src/artisan/adjustments.ts'
+import { defaultAdjustmentsRoot, previewManifestSchema, validateFinalizationSource } from './finalization.ts'
 
 const APP_ROOT = process.env.INVOICE_STUDIO_APP_ROOT ?? '/srv/cobalt-invoice/app'
 const PREVIEW_ROOT = path.resolve(APP_ROOT, 'output', 'previews')
 const NUMBER = /^\d{6}$/
+
+/** Resolve an --adjustments path, accepting only a file directly inside the canonical adjustments directory. */
+export async function canonicalAdjustmentPath(requestedPath: string, adjustmentsRoot = defaultAdjustmentsRoot()): Promise<string> {
+  let canonicalRoot: string
+  let canonicalPath: string
+  try {
+    canonicalRoot = await realpath(adjustmentsRoot)
+    canonicalPath = await realpath(requestedPath)
+  } catch {
+    throw new Error('Adjustment file or canonical adjustments directory is missing')
+  }
+  if (path.dirname(canonicalPath) !== canonicalRoot || !ADJUSTMENT_FILE_NAME.test(path.basename(canonicalPath))) {
+    throw new Error('Adjustments must be a <from>_<through>.json file inside the canonical artisan-adjustments directory')
+  }
+  return canonicalPath
+}
 
 export function parseCommand(argv: string[]) {
   const [operation, ...args] = argv
@@ -27,8 +44,11 @@ export function parseCommand(argv: string[]) {
   return { operation, flags }
 }
 
-export function previewRunnerArgs(from: string, through: string, startNumber: string): string[] {
-  return ['run', '--silent', 'invoice:artisan:preview', '--', '--from', from, '--through', through, '--start-number', startNumber]
+export function previewRunnerArgs(from: string, through: string, startNumber: string, adjustmentsPath?: string): string[] {
+  return [
+    'run', '--silent', 'invoice:artisan:preview', '--', '--from', from, '--through', through, '--start-number', startNumber,
+    ...(adjustmentsPath ? ['--adjustments', adjustmentsPath] : []),
+  ]
 }
 
 export function finalizeRunnerArgs(previewDirectory: string, invoiceNumbers: string[]): string[] {
@@ -62,8 +82,16 @@ async function validatePreview(flags: Map<string, string>) {
     previewDirectory: previewPath,
     invoiceNumbers: manifest.invoiceNumbers,
     finalRoot: path.resolve(APP_ROOT, 'output', 'final'),
+    adjustmentsRoot: defaultAdjustmentsRoot(),
   })
-  console.log(JSON.stringify({ ok: true, operation: 'artisan-validate', previewId, previewPath, invoiceNumbers: validated.sources.map(({ invoiceNumber }) => invoiceNumber) }))
+  console.log(JSON.stringify({
+    ok: true,
+    operation: 'artisan-validate',
+    previewId,
+    previewPath,
+    invoiceNumbers: validated.sources.map(({ invoiceNumber }) => invoiceNumber),
+    manualAdjustmentIds: validated.sources.flatMap(({ manualAdjustmentIds }) => manualAdjustmentIds),
+  }))
 }
 
 export async function reportFinalizedBatch(finalRoot: string, previewId: string, invoiceNumbers: string[]) {
@@ -128,7 +156,9 @@ async function preview(flags: Map<string, string>) {
     throw new Error('Dates must use YYYY-MM-DD')
   }
   if (!NUMBER.test(startNumber)) throw new Error('Start number must contain exactly six digits')
-  await runNpm(previewRunnerArgs(from, through, startNumber))
+  const requestedAdjustments = flags.get('--adjustments')
+  const adjustmentsPath = requestedAdjustments ? await canonicalAdjustmentPath(requestedAdjustments) : undefined
+  await runNpm(previewRunnerArgs(from, through, startNumber, adjustmentsPath))
 }
 
 async function finalize(flags: Map<string, string>) {
@@ -159,6 +189,7 @@ async function finalize(flags: Map<string, string>) {
     previewDirectory: canonicalPath,
     invoiceNumbers: manifestNumbers,
     finalRoot: path.resolve(APP_ROOT, 'output', 'final'),
+    adjustmentsRoot: defaultAdjustmentsRoot(),
   })
   await runNpm(finalizeRunnerArgs(canonicalPath, manifestNumbers))
   console.log(JSON.stringify(await reportFinalizedBatch(path.resolve(APP_ROOT, 'output', 'final'), previewId, manifestNumbers)))
@@ -167,7 +198,7 @@ async function finalize(flags: Map<string, string>) {
 export async function execute(command: ReturnType<typeof parseCommand>) {
   switch (command.operation) {
     case 'artisan-preview':
-      if ([...command.flags.keys()].some((key) => !['--from', '--through', '--start-number'].includes(key))) throw new Error('Unexpected option for artisan-preview')
+      if ([...command.flags.keys()].some((key) => !['--from', '--through', '--start-number', '--adjustments'].includes(key))) throw new Error('Unexpected option for artisan-preview')
       return preview(command.flags)
     case 'artisan-validate':
       if ([...command.flags.keys()].some((key) => !['--preview-id', '--preview-path', '--invoice-numbers'].includes(key))) throw new Error('Unexpected option for artisan-validate')

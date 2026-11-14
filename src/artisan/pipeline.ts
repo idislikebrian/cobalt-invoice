@@ -12,7 +12,12 @@ import {
   type ArtisanCategory,
 } from './config'
 import { localDateAt, splitAcrossLocalDates, weekStartForDate } from './dates'
-import type { BillingWeek } from './batch'
+import {
+  DOCUMENT_DATE_BASIS_PERIOD_ONLY,
+  DOCUMENT_DATE_BASIS_WITH_GENERATION,
+  type BillingWeek,
+} from './batch'
+import { adjustmentAudits, presentedWorklogCells, type ValidatedAdjustments, type WorklogCell } from './adjustments'
 import type {
   BoundarySplitAudit,
   EntryAudit,
@@ -72,7 +77,17 @@ function validateEntry(entry: TogglDetailedEntry): { blockers: ReviewMessage[]; 
   }
 }
 
-function baseInvoice(week: BillingWeek, quarterUnits: number, cells: GroupedCellAudit[], sender: InvoiceData['sender']): InvoiceData {
+/**
+ * Client-facing invoice: one weekly service line and the weekly worklog.
+ * For unadjusted weeks these are exactly the Toggl-derived values; for adjusted
+ * weeks the caller passes the consolidated quantity and presented cells.
+ */
+function baseInvoice(
+  week: BillingWeek,
+  quarterUnits: number,
+  cells: readonly WorklogCell[],
+  sender: InvoiceData['sender'],
+): InvoiceData {
   return invoiceSchema.parse({
     invoiceNumber: week.invoiceNumber,
     template: 'weekly-time',
@@ -113,7 +128,24 @@ export interface PipelineResult {
   unassignedBlockers: ReviewMessage[]
 }
 
-export function buildWeeklyPreviews(entries: TogglDetailedEntry[], weeks: BillingWeek[], sender: InvoiceData['sender']): PipelineResult {
+export interface PipelineOptions {
+  /** Manually approved, non-Toggl adjustments; must target exactly one week in the batch. */
+  adjustments?: ValidatedAdjustments
+}
+
+export function buildWeeklyPreviews(
+  entries: TogglDetailedEntry[],
+  weeks: BillingWeek[],
+  sender: InvoiceData['sender'],
+  options: PipelineOptions = {},
+): PipelineResult {
+  const adjustments = options.adjustments
+  if (adjustments) {
+    const target = weeks.filter((week) => week.from === adjustments.billingPeriod.from && week.through === adjustments.billingPeriod.through)
+    if (weeks.length !== 1 || target.length !== 1) {
+      throw new Error('Adjustments require a single-week batch matching the adjustment billing period')
+    }
+  }
   const weekByStart = new Map(weeks.map((week) => [week.from, week]))
   const states = new Map(weeks.map((week) => [week.from, {
     entryIds: new Set<string>(),
@@ -179,10 +211,31 @@ export function buildWeeklyPreviews(entries: TogglDetailedEntry[], weeks: Billin
     }
     const rawSeconds = groupedCells.reduce((sum, cell) => sum + cell.rawSeconds, 0)
     const quarterUnits = groupedCells.reduce((sum, cell) => sum + cell.roundedQuarterUnits, 0)
-    const subtotalCents = (quarterUnits * STANDARD_RATE_CENTS) / 4
+    const weekAdjustments = adjustments?.adjustments ?? []
+    const adjustmentQuarterUnits = weekAdjustments.reduce((sum, adjustment) => sum + adjustment.quarterUnits, 0)
+    const invoiceQuarterUnits = quarterUnits + adjustmentQuarterUnits
+    const subtotalCents = (invoiceQuarterUnits * STANDARD_RATE_CENTS) / 4
     const discountCents = (subtotalCents * DISCOUNT_BASIS_POINTS) / 10_000
+    const adjustmentAudit = adjustments
+      ? {
+          manualAdjustments: adjustmentAudits(weekAdjustments),
+          adjustmentSource: adjustments.source,
+          adjustmentQuarterUnits,
+          invoiceBilledQuarterUnits: invoiceQuarterUnits,
+          documentDates: {
+            billingPeriod: { from: week.from, through: week.through },
+            documentDate: week.issueDate,
+            dueDate: week.dueDate,
+            documentDateBasis: week.generatedOn ? DOCUMENT_DATE_BASIS_WITH_GENERATION : DOCUMENT_DATE_BASIS_PERIOD_ONLY,
+            previewGeneratedOn: week.generatedOn,
+            notIssuanceEvidence: true as const,
+          },
+        }
+      : {}
     return {
-      invoice: baseInvoice(week, quarterUnits, groupedCells, sender),
+      invoice: adjustments
+        ? baseInvoice(week, invoiceQuarterUnits, presentedWorklogCells(groupedCells, weekAdjustments), sender)
+        : baseInvoice(week, quarterUnits, groupedCells, sender),
       audit: {
         invoiceNumber: week.invoiceNumber,
         billingPeriod: { from: week.from, through: week.through },
@@ -197,6 +250,7 @@ export function buildWeeklyPreviews(entries: TogglDetailedEntry[], weeks: Billin
         finalTotalCents: subtotalCents - discountCents,
         blockers: state.blockers,
         warnings: state.warnings,
+        ...adjustmentAudit,
       },
     }
   })
